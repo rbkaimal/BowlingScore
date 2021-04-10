@@ -13,4 +13,8 @@
     <PackageReference Include="coverlet.collector" Version="1.2.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\Apis\BowlingScore.Api\BowlingScore.Api.csproj" />
+  </ItemGroup>
+
 </Project>
