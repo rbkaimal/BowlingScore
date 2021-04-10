@@ -1,3 +1,6 @@
+using BowlingScore.Api.Infrastructure.Filters;
+using BowlingScore.Api.Services;
+using BowlingScore.Api.Services.Interface;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -24,7 +27,10 @@ namespace BowlingScore.Api
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddControllers();
+            services.AddScoped<IScoreCalculator, ScoreCalculator>();
+            services.AddControllers(options =>
+                                    options.Filters.Add(typeof(HttpGlobalExceptionFilter)))
+                    .AddNewtonsoftJson();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -34,7 +40,10 @@ namespace BowlingScore.Api
             {
                 app.UseDeveloperExceptionPage();
             }
-
+            else
+            {
+                app.UseExceptionHandler("/Error");
+            }
             app.UseRouting();
 
             app.UseAuthorization();

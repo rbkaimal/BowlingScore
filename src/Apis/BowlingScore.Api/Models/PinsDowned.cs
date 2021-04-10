@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 
 namespace BowlingScore.Models
 {
-    public class PinsDowned
+    public class PinsDownedInfo
     {
-        public int[] Count { get; set; }
+        public IEnumerable<int> PinsDowned { get; set; }
     }
 }
