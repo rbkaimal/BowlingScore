@@ -10,8 +10,16 @@ namespace BowlingScore.Api.Services
 {
     public class ScoreCalculator : IScoreCalculator
     {
+        private const int StrikePinsCount = 10;
+        private const int MaxFrames = 10;
+        private const int MaxSizePinsDowned = 21;
+        
         public Score CalculateScore(IEnumerable<int> pinsDowned)
         {
+            if(pinsDowned.Count() > MaxSizePinsDowned)
+                throw new ArgumentException($"Invalid values in {nameof(pinsDowned)}. Pins down length cannot exceed {MaxSizePinsDowned}  ");
+            if (pinsDowned.Any(x => x < 0 || x > 10))
+                throw new ArgumentException($"Invalid values in {nameof(pinsDowned)}. Pins down in each throw should be between 0 and 10  ");
             //Create Frames
             var frames = CreateFrames(pinsDowned);
             //calcute framescores
@@ -20,11 +28,12 @@ namespace BowlingScore.Api.Services
             var score = CalculateScore(frames);
             return score;
         }
+
+       
+
+        //here we create frames from the input array of pinsDowned
         private IDictionary<int,Frame> CreateFrames(IEnumerable<int> pinsDowned)
         {
-            //todo:
-            // validate input 
-
             var frames = new Dictionary<int,Frame>();
             var pinsDownedArray = pinsDowned.ToArray();
             var i = 0;
@@ -32,18 +41,17 @@ namespace BowlingScore.Api.Services
 
             while (i < pinsDownedArray.Length)
             {
-                var currentFrame = new Frame();
                 frameKey = frameKey + 1;
-                if (pinsDownedArray[i] == 10)
+                var currentFrame = new Frame { FrameNo = frameKey };                
+                if (pinsDownedArray[i] == StrikePinsCount)
                 {
                     //this is a strike
-                    currentFrame.FirstThrowPinsDowned = 10;
-                    currentFrame.SecondThrowPinsDowned = 0;
+                    currentFrame.FirstThrowPinsDowned = StrikePinsCount;
                     currentFrame.Strike = true;
                     currentFrame.Spare = false;
                     currentFrame.CanDetermineCorrectScore = CanDetermineFrameScoreForStrike(pinsDownedArray, i);
-
-                    i = i + 1;
+                                        
+                    i = i + 1;                    
 
                 }                
                 else
@@ -51,37 +59,53 @@ namespace BowlingScore.Api.Services
                     //take value from next element
                     //this could be spare or open frame 
                     currentFrame.FirstThrowPinsDowned = pinsDownedArray[i];
-                    if (i + 1 < pinsDownedArray.Length)// make sure next value exists
+                    i = i + 1; //move to next
+                    if (i  < pinsDownedArray.Length)// make sure next value exists
                     {
-                        currentFrame.SecondThrowPinsDowned = pinsDownedArray[i + 1];
-                        currentFrame.Spare = (currentFrame.FirstThrowPinsDowned + currentFrame.SecondThrowPinsDowned) == 10;
+                        currentFrame.SecondThrowPinsDowned = pinsDownedArray[i];
+                        currentFrame.Spare = (currentFrame.FirstThrowPinsDowned + currentFrame.SecondThrowPinsDowned) == StrikePinsCount;
                         currentFrame.Strike = false;
                         currentFrame.CanDetermineCorrectScore = currentFrame.Spare ? CanDetermineFrameScoreForSpare(pinsDownedArray, i) : true;
-                        i = i + 2;
+                        i = i + 1;
                     }
                     else
                     {
                         currentFrame.CanDetermineCorrectScore = false;
-                        i = i + 1;
                     }
                     
 
+                }
+                if (IsLastFrame(frameKey))
+                {
+                    currentFrame.LastFrame = true;
+                    UpdateLastFrame(currentFrame, pinsDownedArray, i);
+                    i = i + 2;
                 }
                 frames.Add(frameKey, currentFrame);
             }
             return frames;
 
         }
+        private void UpdateLastFrame(Frame frame, int[] pinsDownedArray, int index)
+        {
+            
+            if (frame.Strike && frame.CanDetermineCorrectScore)
+            {
+                frame.SecondThrowPinsDowned = pinsDownedArray[index ];
+                frame.BonusThrowPinsDowned = pinsDownedArray[index + 1];
+            }
+            else if (frame.Spare && frame.CanDetermineCorrectScore)
+            {
+                frame.BonusThrowPinsDowned = pinsDownedArray[index ];
+            }
+            
+        }
         private void CalculateFrameScores(IDictionary<int, Frame> frames)
         {
             for(int i=1; i<=10; i++)
             {
                 if (frames.ContainsKey(i))
-                {
-                    var currentFrame = frames[i];
-                    currentFrame.FrameScore = CalculateFrameScore(frames, i);
-                    frames[i] = currentFrame;
-                }
+                    frames[i].FrameScore = GetFrameScore(frames, frames[i]);
                 else
                     break;                  
                
@@ -91,9 +115,8 @@ namespace BowlingScore.Api.Services
         {
             var gameCompleted = true;
             var progressScore = 0;
-            var size = frames.Count > 10 ? 10 : frames.Count;
-            var progressScores = new int[size];
-            for (int i = 1; i <= 10; i++)
+            var progressScores = new int[frames.Count];
+            for (int i = 1; i <= MaxFrames; i++)
             {
                 if (frames.ContainsKey(i))
                 {
@@ -126,38 +149,62 @@ namespace BowlingScore.Api.Services
             //if we have score for next roll 
             return currentIndex + 1 < pinsDownedArray.Length;
         }
-        private int CalculateFrameScore(IDictionary<int, Frame> frames , int currentFrameKey)
+        private bool IsLastFrame(int frameKey)
         {
-            var currentFrame = frames[currentFrameKey];
-            var currentScore = -1;
-            if (!currentFrame.CanDetermineCorrectScore )
-                return currentScore;
+            return frameKey == MaxFrames;
+        }
+        public int GetFrameScore(IDictionary<int, Frame> frames, Frame frame)
+        {
+            var score = -1;
+            if (!frame.CanDetermineCorrectScore)
+                return score;
+            if (frame.LastFrame)
+                return frame.TotalPinsDowned;
             else
             {
-                currentScore = 0;
-                if (currentFrame.Strike)
+                if (frame.Strike && frame.CanDetermineCorrectScore)
                 {
-                    var nextFrame = frames[currentFrameKey + 1];
-                    currentScore = 10;
-                    
-                    if (!nextFrame.Strike)
-                        currentScore = currentScore + nextFrame.FirstThrowPinsDowned + nextFrame.SecondThrowPinsDowned;                    
-                    else 
-                        currentScore = currentScore + 10 + frames[currentFrameKey + 2].FirstThrowPinsDowned;
+                    //if we have a strike then we need to add pins from next frame
+                    if (frames.TryGetValue(frame.FrameNo + 1, out var nextFrame))
+                    {
+                        if (!nextFrame.Strike)
+                        {
+                            return frame.TotalPinsDowned + nextFrame.FirstThrowPinsDowned + nextFrame.SecondThrowPinsDowned;
+
+                        }
+                        else //if next frame is strike then we need pins from following frame
+                        {
+                            if (nextFrame.LastFrame)
+                            {
+                                return frame.TotalPinsDowned + nextFrame.FirstThrowPinsDowned + nextFrame.SecondThrowPinsDowned;
+                            }
+                            else if (frames.TryGetValue(frame.FrameNo + 2, out var secondFrame))
+                            {
+                                return frame.TotalPinsDowned + nextFrame.FirstThrowPinsDowned + secondFrame.FirstThrowPinsDowned;
+                            }
+                            
+                        }
+                    }
+
                 }
-                else if (currentFrame.Spare)
+                else if (frame.Spare && frame.CanDetermineCorrectScore)
                 {
-                    var nextFrame = frames[currentFrameKey + 1];
-                    currentScore = 10 + nextFrame.FirstThrowPinsDowned;
+                    //if we have spare we need to add pins from  first throw for next frame
+                    if (frames.TryGetValue(frame.FrameNo + 1, out var nextFrame))
+                        return frame.TotalPinsDowned + nextFrame.FirstThrowPinsDowned;
 
                 }
                 else
                 {
-                    currentScore = currentFrame.FirstThrowPinsDowned + currentFrame.SecondThrowPinsDowned;
+                   return frame.TotalPinsDowned;
                 }
-                
+
             }
-            return currentScore;
+            //we should not reach here, in case the we could nto determine sorrect score
+            frame.CanDetermineCorrectScore = false;
+            return score;
         }
+
+      
     }
 }
