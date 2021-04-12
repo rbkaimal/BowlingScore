@@ -12,9 +12,10 @@
   
   
 
-# Sample Request
-  * Post request to {ApiBaseUrl}/scores
-  * {   "pinsDowned": [1,1,1,1,9,1,2,8,9,1,10,10]}
+# Usage 
+  * Post request to below url with the pins downed in each throw
+  * URL:  {ApiBaseUrl}/scores , replace {ApiBaseUrl} actual url where application is running
+  * sample payload: { "pinsDowned": [1,1,1,1,9,1,2,8,9,1,10,10]}
   
 # Unit Testing
   * Unit testing completed for the  classes. 
@@ -22,5 +23,5 @@
 # Improvements possible
   * The score once calculated can be cached  if needed
   * The API end point can be protected to add security
-  *
+  
 
